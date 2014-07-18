@@ -8,12 +8,23 @@ nodes, it does not hold the data. Rather it hardlinks all the data into a local
 '''
 
 import argparse
+import os
+import sys
+import pickle
 
 __version__ = "0.0.0"
+__prog__ = 'pyb'
 
 # ==============
 # Infrastructure
 # ==============
+
+class OSVars:
+    HOME = 'PYBHOME'
+    DATA_DIR = '.data'
+    BLAST_DIR = 'blastdb'
+    FILE_DIR = 'files'
+    DATA = 'pyb.dat'
 
 class Parser:
     def __init__(self):
@@ -21,10 +32,10 @@ class Parser:
         self.parser.add_argument(
             '-v', '--version',
             action='version',
-            version='%(prog)s {}'.format(__version__)
+            version='{} {}'.format(__prog__, __version__)
         )
         subparsers = self.parser.add_subparsers(
-            metavar='[ for help on each: %(prog)s <subcommand> -h ]',
+            metavar='[ for help on each: {}s <subcommand> -h ]'.format(__prog__),
             title='subcommands'
         )
 
@@ -108,11 +119,6 @@ class Add(Subcommand):
             nargs="+"
         )
         self.parser.add_argument(
-            '-k', '--schema',
-            help='set read schema for the datatype from a file',
-            type=argparse.FileType('r')
-        )
-        self.parser.add_argument(
             '-m', '--copy-method',
             help='choose to move(m), copy(c), hard link(l) or ' +
                  'symlink(s) the data to PYBHOME',
@@ -128,22 +134,87 @@ class Add(Subcommand):
 # =============
 
 class Node():
-    def __init__(self):
+    def __init__(self, parent):
+        self.parent = parent
         self.children = set()
-        self.parent = None
         self.tags = {}
+
+    def add_child(self, child):
+        self.children.add(child)
+
+    def remove_child(self, child):
+        self.children.remove(child)
+
+    def get_tag(self, tag):
+        try:
+            return(self.tags[tag])
+        except KeyError:
+            return(None)
+
+    def set_tag(self, tag, value):
+        self.tags[tag] = value
+
+class DataHoldingNode(Node):
+    def __init__(self, **kwargs):
+        super.__init__(**kwargs)
         self.data = set()
 
-class DataCollection()
-    def __init__(self, parent):
-        self.parent = parent
-        self.children = set()
+class Taxon(DataHoldingNode):
+    def __init__(self, taxid, sciname, common=None, syn=set(), **kwargs):
+        super.__init__(*args, **kwargs)
+        self.taxon_id = taxid
+        self.scientific_name = sciname
+        self.common_name = common
+        self.synonyms = syn
 
-class Datum():
-    def __init__(self, parent):
-        self.parent = parent
+class Datum(Node):
+    def __init__(self, filename, **kwargs):
+        super.__init__(**kwargs)
+        self.filename = filename
+        self.uuid = None
+        self.child = None
+
+    def make_uuid(self):
+        '''
+        Calculate md5 checksum for the data, this will be used as the unique
+        identifier.
+        '''
+        pass
+
+class Seq(Datum):
+    def __init__(self, alphabet, **kwargs):
+        super.__init__(**kwargs)
+        self.alphabet = alphabet
+        self.blastname = None
+        self.annotations
+
+    def prepare_blastdb(self):
+        pass
+
+
+
+# =========
+# Utilities
+# =========
+
+def err(msg, status=1):
+    print(msg, file=sys.stderr)
+    sys.exit(status)
 
 
 if __name__ == '__main__':
+    try:
+        home = os.environ[OSVars.HOME]
+    except KeyError:
+        err('No PYBHOME environmental variable found')
+
+    try:
+        datapath = os.path.join(home, '.data')
+        if not os.path.exists(datapath):
+            os.makedirs(datapath)
+    except OSError:
+        err("Cannot create directory '{}'".format(datapath))
+
+    root = Node(parent=None)
     args = Parser().args
     args.func(args)
