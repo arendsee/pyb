@@ -1,14 +1,10 @@
 PYB
 ===
 
-Description
-===========
-
 Creates a virtual file directry in which all files are organized by position on
 a phylogenetic tree (specifically the NCBI common tree).
 
-Subcommands
-===========
+## Subcommands
 
  * add - add a new file to the tree
  * rm - remove a file from the tree
@@ -16,12 +12,11 @@ Subcommands
  * cp - copy from the tree to filesystem
  * util - various utility functions (updating, diagnostics, BLAST functions, etc)
 
-Examples 
-========
+## Examples 
 
 (fyi, none of this is yet implemented)
 
-## pyb add - add files to the virtual directory
+### pyb add - add files to the virtual directory
 
 ``` bash
 # Adds a file containing *Glycine max* protein sequence
@@ -33,7 +28,7 @@ $ pyb add -q prot -f Glycine_max.faa -d 'Glycine_max'
 $ pyb add -gf Glycine_max.faa
 ```
 
-## `pyb ls` - list files in the virtual directory
+### `pyb ls` - list files in the virtual directory
 
 ```bash
 # Lists all protein coding sequence files that are in the 'rosids' clade
@@ -42,7 +37,7 @@ $ pyb ls -q prot -d rosids
 $ pyb ls -q prot -d rosids -s
 ```
 
-## `pyb cp` - copies data to given directory
+### `pyb cp` - copies data to given directory
 
 ```bash
 # copies data
@@ -53,7 +48,7 @@ $ pyb cp -s -q nucl gff -d rosids $HOME/path/to/wherever
 $ pyb cp -l -q nucl gff -d rosids $HOME/path/to/wherever
 ```
 
-## `pyb util` - utilities
+### `pyb util` - utilities
 
 ```bash
 # Makes BLAST databases for each protein sequence
@@ -62,5 +57,3 @@ $ pyb util --makeblastdb
 $ blastdb_aliastool -dbtyp prot -title rosids -out rosids \
 $ -dblist `pyb ls -s -d rosids -b prot`
 ```
-
-
