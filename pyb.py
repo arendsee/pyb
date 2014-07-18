@@ -22,9 +22,7 @@ __prog__ = 'pyb'
 class OSVars:
     HOME = 'PYBHOME'
     DATA_DIR = '.data'
-    BLAST_DIR = 'blastdb'
-    FILE_DIR = 'files'
-    DATA = 'pyb.dat'
+    DATA = 'pyb.pkl'
 
 class Parser:
     def __init__(self):
@@ -34,37 +32,21 @@ class Parser:
             action='version',
             version='{} {}'.format(__prog__, __version__)
         )
-        subparsers = self.parser.add_subparsers(
+
+        sp = self.parser.add_subparsers(
             metavar='[ for help on each: {}s <subcommand> -h ]'.format(__prog__),
             title='subcommands'
         )
 
-        Add(
-            subparsers.add_parser(
-                'add',
-                help='add a data file'
-            )
-        )
-
-        Ls(
-            subparsers.add_parser(
-                'ls',
-                help='list the contents of pyb database'
-            )
-        )
-
-        Get(
-            subparsers.add_parser(
-                'get',
-                help='symlink data from PYBDB to working directory'
-            )
-        )
+        Put(sp, 'put', 'add a data file')
+        Get(sp, 'get', 'symlink data from PYBDB to working directory')
+        Ls(sp, 'ls', 'list the contents of pyb database')
 
         self.args = self.parser.parse_args()
 
 class Subcommand:
-    def __init__(self, parser):
-        self.parser = parser
+    def __init__(self, subparser, cmd, desc):
+        self.parser = subparser.add_parser(cmd, help=desc)
         self._parse()
         self.parser.set_defaults(func=self.func)
 
@@ -74,70 +56,60 @@ class Subcommand:
     def func(self):
         raise NotImplemented
 
-class Get(Subcommand):
+class Put(Subcommand):
     def _parse(self):
-        pass
+        self.parser.add_argument(
+            'infiles',
+            help='files to add',
+            nargs='+',
+            type=argparse.FileType('r')
+        )
+        self.parser.add_argument(
+            'taxon',
+            help="taxid or name (e.g. 4577 or Zea_mays), can add subfolder (e.g. 4577/ecotypes)",
+        )
 
     def func(self, args):
-        print('get')
+        print('put')
+
+class Get(Subcommand):
+    def _parse(self):
+        self.parser.add_argument(
+            'from',
+            help='files to copy out (e.g. rosids/*.faa)',
+            nargs='+',
+        )
+        self.parser.add_argument(
+            'to',
+            help="path in filesystem to copy to (e.g. '.')",
+        )
+
+    def func(self, args):
+        print('put')
 
 class Ls(Subcommand):
     def _parse(self):
         self.parser.add_argument(
-            '-T', '--print-tags',
-            help='list of tags to print',
-            nargs='+'
+            'files',
+            help='files to ls'
         )
 
     def func(self, args):
         print('ls')
-
-class Add(Subcommand):
-    def _parse(self):
-        self.parser.add_argument(
-            '-f', '--file',
-            help='Data filename',
-            type=argparse.FileType('r')
-        )
-        self.parser.add_argument(
-            '-n', '--sciname',
-            help='Taxon scientific name'
-        )
-        self.parser.add_argument(
-            '-d', '--taxon-id',
-            help='Taxon id'
-        )
-        self.parser.add_argument(
-            '-g', '--guess-id',
-            help='Guess the sciname from the filename',
-            action='store_true',
-            default=False
-        )
-        self.parser.add_argument(
-            '-t', '--tags',
-            help='peg tags and values to data (<tag>="<value>")',
-            nargs="+"
-        )
-        self.parser.add_argument(
-            '-m', '--copy-method',
-            help='choose to move(m), copy(c), hard link(l) or ' +
-                 'symlink(s) the data to PYBHOME',
-            choices=['s', 'l', 'c', 'm']
-        )
-
-    def func(self, args):
-        print('add')
 
 
 # =============
 # Data Handling
 # =============
 
-class Node():
-    def __init__(self, parent):
+class Taxon():
+    def __init__(self, parent, taxid, sciname, common=None, syn=set(), **kwargs):
         self.parent = parent
         self.children = set()
-        self.tags = {}
+        self.taxon_id = taxid
+        self.scientific_name = sciname
+        self.common_name = common
+        self.synonyms = syn
 
     def add_child(self, child):
         self.children.add(child)
@@ -154,43 +126,17 @@ class Node():
     def set_tag(self, tag, value):
         self.tags[tag] = value
 
-class DataHoldingNode(Node):
-    def __init__(self, **kwargs):
-        super.__init__(**kwargs)
-        self.data = set()
+    @classmethod
+    def get_scinames(cls, taxids):
+        raise NotImplemented
 
-class Taxon(DataHoldingNode):
-    def __init__(self, taxid, sciname, common=None, syn=set(), **kwargs):
-        super.__init__(*args, **kwargs)
-        self.taxon_id = taxid
-        self.scientific_name = sciname
-        self.common_name = common
-        self.synonyms = syn
+    @classmethod
+    def get_taxids(cls, scinames):
+        raise NotImplemented
 
-class Datum(Node):
-    def __init__(self, filename, **kwargs):
-        super.__init__(**kwargs)
-        self.filename = filename
-        self.uuid = None
-        self.child = None
-
-    def make_uuid(self):
-        '''
-        Calculate md5 checksum for the data, this will be used as the unique
-        identifier.
-        '''
-        pass
-
-class Seq(Datum):
-    def __init__(self, alphabet, **kwargs):
-        super.__init__(**kwargs)
-        self.alphabet = alphabet
-        self.blastname = None
-        self.annotations
-
-    def prepare_blastdb(self):
-        pass
-
+    @classmethod
+    def get_lineages(cls, taxids):
+        raise NotImplemented
 
 
 # =========
@@ -215,6 +161,20 @@ if __name__ == '__main__':
     except OSError:
         err("Cannot create directory '{}'".format(datapath))
 
-    root = Node(parent=None)
+
+    pkl = os.path.join(home, OSVars.DATA)
+
+    try:
+        f = open(pkl, 'rb')
+        root = pickle.load(f)
+        f.close()
+    except IOError:
+        root = Taxon(parent=None, taxid=0, sciname='root')
+    except Exception as e:
+        err('unknown pickle error\n{}'.format(e))
+
     args = Parser().args
     args.func(args)
+
+    with open(pkl, 'wb') as f:
+        pickle.dump(root, f)
