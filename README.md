@@ -16,7 +16,7 @@ a phylogenetic tree (specifically the NCBI common tree).
 
 (fyi, none of this is yet implemented)
 
-### pyb add - add files to the virtual directory
+### `pyb add` - add files to the virtual directory
 
 ``` bash
 # Adds a file containing *Glycine max* protein sequence
